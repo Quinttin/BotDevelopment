@@ -5626,12 +5626,68 @@ async def pip_confirmation_monitor(context: ContextTypes.DEFAULT_TYPE) -> None:
         )
     maybe_stop_pip_monitor()
 
+async def breakeven_monitor(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Move stop loss to breakeven when position profit exceeds target."""
+    try:
+        target = config["trade_manager"].get("breakeven_profit")
+        if not target or target <= 0:
+            return
+        with mt5_sync_lock:
+            positions = mt5.positions_get() or []
+        if not positions:
+            return
+        for pos in positions:
+            if pos.profit < target:
+                continue
+            symbol_info = mt5.symbol_info(pos.symbol)
+            tick = mt5.symbol_info_tick(pos.symbol)
+            if not symbol_info or not tick or symbol_info.point <= 1e-9:
+                continue
+            point = symbol_info.point
+            digits = symbol_info.digits
+            min_distance = symbol_info.trade_stops_level * point
+            entry = pos.price_open
+            current_sl = pos.sl
+            current_price = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
+            new_sl = None
+            if pos.type == mt5.ORDER_TYPE_BUY:
+                if (current_sl == 0.0 or current_sl < entry) and current_price - entry >= min_distance:
+                    new_sl = round(entry, digits)
+            elif pos.type == mt5.ORDER_TYPE_SELL:
+                if (current_sl == 0.0 or current_sl > entry) and entry - current_price >= min_distance:
+                    new_sl = round(entry, digits)
+            if new_sl is not None:
+                request = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "position": pos.ticket,
+                    "symbol": pos.symbol,
+                    "sl": new_sl,
+                    "tp": pos.tp,
+                }
+                result = mt5.order_send(request)
+                if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                    logging.info(f"Breakeven SL set for {pos.symbol} ticket {pos.ticket} at {new_sl:.{digits}f}")
+                else:
+                    err_comment = getattr(result, 'comment', 'Send Failed') if result else 'Send Failed'
+                    logging.error(f"Failed breakeven SL for ticket {pos.ticket}: {err_comment}")
+                time.sleep(0.1)
+    except Exception as e:
+        logging.error(f"Error in breakeven_monitor: {e}", exc_info=True)
+
 async def trade_close_monitor(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Automatically close trades when profit target in money is reached."""
     try:
         with mt5_sync_lock:
             positions = mt5.positions_get() or []
-        if not positions:
+            account_info = mt5.account_info()
+        if not positions or not account_info:
+            return
+
+        equity_target = config["trade_manager"].get("equity_profit_target")
+        if equity_target and account_info.profit >= equity_target:
+            dummy = type('Dummy', (), {'effective_chat': type('C', (), {'id': config['telegram']['chat_id']})(), 'message': None, 'callback_query': None})()
+            await _close_positions(dummy, context)
+            logging.info('trade_close_monitor: equity profit target reached; issued /close_all')
             return
 
         for pos in positions:
@@ -5701,6 +5757,7 @@ async def trade_manager_loop(context: ContextTypes.DEFAULT_TYPE) -> None:
                     runtime_state["scanner_auto_paused"] = False
                 await safe_send_message(context, "▶️ Scanner resumed: open trades below limit.")
         await sync_open_trades()
+        await breakeven_monitor(context)
         await trailing_stop_monitor(context)
         await asyncio.sleep(0)  # Yield control
         # Additional monitors if defined
