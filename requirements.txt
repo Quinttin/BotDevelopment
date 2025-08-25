@@ -1,0 +1,14 @@
+python-telegram-bot
+MetaTrader5
+pandas
+pandas_ta
+numpy
+pandas_market_calendars
+aiosqlite
+scikit-learn
+joblib
+tensorflow
+optuna
+requests
+pytz
+APScheduler

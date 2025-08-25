@@ -339,12 +339,12 @@ MODE_FULL_AUTO = "FULL_AUTO"
 # Default configuration structure
 DEFAULT_CONFIG = {
     "mt5_credentials": {
-        "terminal_path": r"C:\Program Files\Zero Markets MetaTrader 5 Terminal\terminal64.exe",
-        "server": "ZeroMarkets-Demo-1",
-        "account_number": 135042169,
-        "password": "Vinmad123$",
+        "terminal_path": "",
+        "server": "",
+        "account_number": 0,
+        "password": "",
     },
-    "operational_mode": MODE_FULL_AUTO, # Added operational mode
+    "operational_mode": MODE_FULL_AUTO,  # Added operational mode
     "scanner": {
         "timeframes": [],
         "symbols": [],
@@ -409,10 +409,10 @@ DEFAULT_CONFIG = {
         },
     },
     "telegram": {
-        "bot_token": "7989910799:AAEBITmiugVZAHNyGffcoYJo86oKmiRkx6I",
-        "chat_id": 7558187962, # Default user chat or channel
-        "channel_id": -1002639924867, # Channel for trade notifications
-        "message_rate_limit": 1.0, # Seconds between messages
+        "bot_token": "",
+        "chat_id": 0,  # Default user chat or channel
+        "channel_id": 0,  # Channel for trade notifications
+        "message_rate_limit": 1.0,  # Seconds between messages
     },
     "background_tasks_interval": 60.0, # Interval for the background runner job
     "initialized": False, # MT5 initialized flag
@@ -485,6 +485,40 @@ def load_config(filename="config.json") -> Dict[str, Any]:
         if "strategy_settings" in loaded["trade_manager"] and isinstance(loaded["trade_manager"]["strategy_settings"], dict):
             cfg["trade_manager"]["strategy_settings"] = DEFAULT_CONFIG["trade_manager"]["strategy_settings"].copy()
             cfg["trade_manager"]["strategy_settings"].update(loaded["trade_manager"]["strategy_settings"])
+
+    # Environment variable overrides
+    cfg["mt5_credentials"]["terminal_path"] = os.getenv(
+        "MT5_TERMINAL_PATH", cfg["mt5_credentials"].get("terminal_path", "")
+    )
+    cfg["mt5_credentials"]["server"] = os.getenv(
+        "MT5_SERVER", cfg["mt5_credentials"].get("server", "")
+    )
+    acc = os.getenv("MT5_ACCOUNT")
+    if acc is not None:
+        try:
+            cfg["mt5_credentials"]["account_number"] = int(acc)
+        except ValueError:
+            logging.warning("Invalid MT5_ACCOUNT environment variable; using config value.")
+    cfg["mt5_credentials"]["password"] = os.getenv(
+        "MT5_PASSWORD", cfg["mt5_credentials"].get("password", "")
+    )
+
+    cfg["telegram"]["bot_token"] = os.getenv(
+        "TELEGRAM_BOT_TOKEN", cfg["telegram"].get("bot_token", "")
+    )
+    chat = os.getenv("TELEGRAM_CHAT_ID")
+    if chat is not None:
+        try:
+            cfg["telegram"]["chat_id"] = int(chat)
+        except ValueError:
+            logging.warning("Invalid TELEGRAM_CHAT_ID environment variable; using config value.")
+    channel = os.getenv("TELEGRAM_CHANNEL_ID")
+    if channel is not None:
+        try:
+            cfg["telegram"]["channel_id"] = int(channel)
+        except ValueError:
+            logging.warning("Invalid TELEGRAM_CHANNEL_ID environment variable; using config value.")
+
     return cfg
 
 config: Dict[str, Any] = load_config()

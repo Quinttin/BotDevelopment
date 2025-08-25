@@ -1,0 +1,13 @@
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Model artifacts
+*.keras
+*.pkl
+
+# Local configuration
+config.json
+
+# SQLite cache
+history_cache.db
