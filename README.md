@@ -26,6 +26,16 @@ pip install -r requirements.txt
    when settings are saved. `config.json` is ignored by Git to avoid
    committing secrets.
 
+### Equity-based protections
+
+The `trade_manager` section of the configuration now supports two optional
+fields:
+
+* `breakeven_profit` – amount of profit (USD) required on a position before its
+  stop-loss is moved to break even.
+* `equity_profit_target` – total open profit (USD) at which all open positions
+  are closed automatically.
+
 ## Models and data
 
 * Historical sample data is provided in `historical_seed.csv`.

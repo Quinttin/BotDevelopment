@@ -41,6 +41,8 @@
     "use_news_filter": false,
     "ai_training": false,
     "ai_training_interval_hours": 24,
+    "breakeven_profit": null,
+    "equity_profit_target": null,
     "lock_in_method": "default",
     "open_mode": "default",
     "strategy_settings": {
